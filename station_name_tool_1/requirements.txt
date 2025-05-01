@@ -2,3 +2,6 @@ streamlit
 pandas
 python-Levenshtein
 google-generativeai
+geopy
+numpy
+certifi
