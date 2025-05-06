@@ -143,7 +143,7 @@ def create_prompt_for_format(batch_data, address_col, other_name_cols, prompt_ty
         4. Remove all diacritics and accents from names.
         5. Ensure the station_name does not exceed 10 words.
         6. Translate station-related terms (Terminal, Gare, Rodoviária, etc.) to English.
-        7. AVOID duplicate names like "Foz Do Jordao - Foz Do Jordao".
+        7. AVOID duplicate in the name.
         8. When the city name appears in both parts, use it ONCE followed by a distinctive landmark, neighborhood, or feature.
         9. If no distinctive feature exists beyond the city name, use only the city name.
 
@@ -225,7 +225,7 @@ def create_prompt_for_format(batch_data, address_col, other_name_cols, prompt_ty
         4. Remove all diacritics and accents from names.
         5. Ensure the station_name does not exceed 10 words.
         6. Translate station-related terms (Terminal, Gare, Rodoviária, etc.) to English.
-        7. AVOID duplicate names like "Foz Do Jordao - Foz Do Jordao".
+        7. AVOID duplicate in the name.
         8. When the city name appears in both parts, use it ONCE followed by a distinctive landmark, neighborhood, or feature.
         9. If no distinctive feature exists beyond the city name, use only the city name.
 
