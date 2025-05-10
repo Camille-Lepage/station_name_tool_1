@@ -107,7 +107,7 @@ dataset_labels = []
 
 if st.session_state.df is not None:
     available_datasets.append("df")
-    dataset_labels.append("Original uploaded data")
+    dataset_labels.append("Reverse Geocoding data")
     
 if st.session_state.df_geocoded is not None:
     available_datasets.append("df_geocoded")
@@ -130,7 +130,7 @@ elif len(available_datasets) == 1:
     df_for_clustering = st.session_state[available_datasets[0]].copy()
     st.write(f"Using {dataset_labels[0]} for clustering")
 else:
-    st.warning("Please upload a dataset first on the Home page.")
+    st.warning("Please complete Step 1: Reverse Geocoding first on the Home page.")
     st.stop()  # Stop execution if no dataset is available
 
 
