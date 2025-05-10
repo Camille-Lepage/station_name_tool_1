@@ -1,4 +1,4 @@
-# pages/1_Geocoding_and_Address.py
+# pages/1_Reverse_Geocoding.py
 # -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
@@ -58,14 +58,14 @@ if 'selected_address_keys' not in st.session_state: # Also initialize address ke
 
 
 # Set page configuration (Optional, but good practice)
-st.set_page_config(page_title="Station Name Processing Tool - Geocoding", layout="wide")
+st.set_page_config(page_title="Reverse Geocoding", layout="wide")
 
 
-st.title("📍 2. Geocoding and Address Formatting")
+st.title("Reverse Geocoding")
 st.markdown("""
-Reverse geocode Latitude/Longitude to get addresses, then format the address column.
+Reverse geocode Latitude/Longitude to get addresses.
 
-**Note:** This tool uses OpenStreetMap for reverse geocoding. It takes approximately 1 second per station, so processing 1000 stations will take around 17 minutes. If the address names are not suitable, consider using a map API, which can be used for free via Google Sheets. Documentation: [Google Sheets Map API Confluence](https://one2go.atlassian.net/wiki/x/CIBPu).
+**Note:** This tool uses OpenStreetMap for reverse geocoding. It takes approximately 1 second per station, so processing 1000 stations will take around 17 minutes. If the address names are not suitable, consider using a map API (for example via Google Sheets). Documentation: [Google Sheets Map API Confluence](https://one2go.atlassian.net/wiki/x/CIBPu).
 """)
 
 # --- Geocoding Step ---
