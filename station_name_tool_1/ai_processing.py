@@ -96,70 +96,27 @@ def create_prompt_for_format(batch_data, address_col, other_name_cols, prompt_ty
     elif prompt_type == 'maps':
         # Improved prompt for Maps API (plain text addresses)
         prompt = """
-        Analyze the following pairs of addresses and names and determine the best station name for each.
+        Analyze the following address data and associated remote names to determine the best single, standardized name (`pn`) for each transportation station.
 
-        Context: These data represent transportation stations (bus, train, etc.) in different languages and countries.
+        Context: These data represent transportation stations (bus, train, etc.) in different languages and countries. Your task is to generate a clean, consistent English name for each station based on the provided information and the following rules.
 
-        Here are examples of what is expected:
+        Goal: For each station, generate a single, standardized name (`pn`) that is informative, concise, and adheres to all rules.
 
-        Example 1:
-        - Address: "Terminal Rodoviário de São Paulo, Avenida Cruzeiro do Sul, 1800, Santana"
-        - Remote name: "Station São Paulo"
-        - Generated name: "Sao Paulo Terminal - Santana"
+        For each station, apply the following steps and formatting rules:
 
-        Example 2:
-        - Address: "123 Main Street, New York, NY 10001"
-        - Remote name: "New York Bus Station"
-        - Generated name: "New York - Main Street"
+        Steps for Name Construction:
+        1.  Identify the city or town or village name from the address structure (e.g., "city", "town").
+        2.  Identify any important specific location information from the address structure.
+        3.  Construct the initial station name by combining the identified city/town, specific location, and the `remote_name` according to the following logic:
+          * If the `remote_name` is the same as or a close variation of the identified city/town name, the generated name should be "City/Town Name - Specific Location" (if a distinct specific location was identified in step 2). If no specific location was identified, use just the "City/Town Name".
+          * If the `remote_name` is *not* the same as the identified city/town name, the generated name should integrate the `remote_name` and the city/town name or specific location in a clear and informative way. Prioritize "City/Town Name - Remote Name" if the city/town name is clearly identifiable. Otherwise, use "Specific Location - Remote Name" or simply the "Remote Name" if no other useful distinguishing information is available from the address. Aim for the most intuitive and concise combination.
 
-        Example 3:
-        - Address: "Gare du Nord, 18 Rue de Dunkerque, 75010 Paris, France"
-        - Remote name: "Paris"
-        - Generated name: "Paris - North Train Station"
-
-        Example 4:
-        - Address: "Av. Alberto Leal Nunes, 1240 - Alto do Balanço, Regeneração - PI, 64490-000, Brazil"
-        - Remote name: "Regeneração"
-        - Generated name: "Regeneracao - Alto Do Balanco"
-
-        Example 5:
-        - Address: "R. Bento Gonçalves, 813 - Centro, Cachoeira do Sul - RS, 96501-151, Brazil"
-        - Remote name: "Parada Vargas"
-        - Generated name: "Cachoeira Do Sul - Parada Vargas"
-
-        Example 6:
-        - Address: "R. Pref. João Costa, 283 - Centro, Unaí - MG, 38610-009, Brazil"
-        - Remote name: "Unai"
-        - Generated name: "Unai - Centro"
-
-        For each station, please:
-        1. Identify the city name.
-        2. Identify any important specific location (terminal, station, shopping mall, neighborhood, district, historical center, city center, etc.).
-        3. The remote_name MUST be included in the station_name:
-           - If remote_name is the city name, use it as the first part and include the specific location after a dash.
-           - If remote_name is NOT the city name, include it after the dash as shown in Example 5.
-
-        Formatting rules:
-        4. Remove all diacritics and accents from names.
-        5. Ensure the station_name does not exceed 10 words.
-        6. Translate station-related terms (Terminal, Gare, Rodoviária, etc.) to English.
-        7. AVOID duplicate in the name.
-        8. When the city name appears in both parts, use it ONCE followed by a distinctive landmark, neighborhood, or feature.
-        9. If no distinctive feature exists beyond the city name, use only the city name.
-
-        Examples of INCORRECT formats (DO NOT USE):
-        - "Paris - Paris"
-        - "Foz Do Jordao - Foz Do Jordao"
-        - "Santa Isabel - Santa Isabel"
-        - "São Paulo - Terminal Rodoviário Tietê"
-        - "Cachoeira Do Sul - Centro" (incorrect because remote_name "Parada Vargas" is missing)
-
-        Corresponding examples of CORRECT formats:
-        - "Paris - North Station" (city + landmark)
-        - "Foz Do Jordao" (city name alone when no distinctive feature)
-        - "Santa Isabel - Bus Terminal" (city + feature)
-        - "Sao Paulo - Tiete Bus Terminal"
-        - "Cachoeira Do Sul - Parada Vargas" (city + remote_name)
+        Formatting Rules:
+        4.  Remove all diacritics and accents from all parts of the name.
+        5.  Ensure the final generated name (`pn`) does not exceed 10 words.
+        6.  Don't keep station-related terms (e.g., "Terminal", "Gare", "Rodoviária", "Estación").
+        7.  Avoid including redundant or consecutive duplicate words in the name.
+        8.  Ensure the final generated name (`pn`) is clean and standardized, applying all the above rules.
 
         Here is the data to process:
         """
@@ -193,55 +150,27 @@ def create_prompt_for_format(batch_data, address_col, other_name_cols, prompt_ty
     else:  # 'nominatim' or other default
         # Prompt for Nominatim (structured addresses)
         prompt = f"""
-        Analyze the following structured address data and determine the best station name for each transportation station.
+        Analyze the following structured address data and associated remote names to determine the best single, standardized name (`pn`) for each transportation station.
 
-        Context: These data represent transportation stations (bus, train, etc.) in different languages and countries.
-        
-        Here are examples of what is expected:
+        Context: These data represent transportation stations (bus, train, etc.) in different languages and countries. Your task is to generate a clean, consistent English name for each station based on the provided information and the following rules.
 
-        Example 1:
-        - Address: {{"road": "Avenida Cruzeiro do Sul", "house_number": "1800", "suburb": "Santana", "city": "São Paulo", "country": "Brazil"}}
-        - Remote name: "Station São Paulo"
-        - Generated name: "Sao Paulo Terminal - Santana"
+        Goal: For each station, generate a single, standardized name (`pn`) that is informative, concise, and adheres to all rules.
 
-        Example 2:
-        - Address: {{"road": "Main Street", "house_number": "123", "city": "New York", "state": "NY", "postcode": "10001", "country": "USA"}}
-        - Remote name: "New York Bus Station"
-        - Generated name: "New York - Main Street"
+        For each station, apply the following steps and formatting rules:
 
-        Example 3:
-        - Address: {{"suburb": "Centro", "neighbourhood": "Novo Arroio do Sal", "town": "Arroio do Sal"}}
-        - Remote name: "Arroio do Sal"
-        - Generated name: "Arroio Do Sal - Centro"
+        Steps for Name Construction:
+        1.  Identify the city or town or village name from the address structure (e.g., "city", "town").
+        2.  Identify any important specific location information from the address structure (by priority: "suburb", "quarter", "neighbourhood", "amenity"...).
+        3.  Construct the initial station name by combining the identified city/town, specific location, and the `remote_name` according to the following logic:
+          * If the `remote_name` is the same as or a close variation of the identified city/town name, the generated name should be "City/Town Name - Specific Location" (if a distinct specific location was identified in step 2). If no specific location was identified, use just the "City/Town Name".
+          * If the `remote_name` is *not* the same as the identified city/town name, the generated name should integrate the `remote_name` and the city/town name or specific location in a clear and informative way. Prioritize "City/Town Name - Remote Name" if the city/town name is clearly identifiable. Otherwise, use "Specific Location - Remote Name" or simply the "Remote Name" if no other useful distinguishing information is available from the address. Aim for the most intuitive and concise combination.
 
-        For each station, please:
-        1. Identify the city name from the address structure.
-        2. Identify any important specific location (terminal, station, shopping mall, neighborhood, district, historical center, city center, etc.).
-        3. The remote_name MUST be included in the station_name:
-           - If remote_name is the city name, use it as the first part and include the specific location after a dash.
-           - If remote_name is NOT the city name, include it after the dash.
-
-        Formatting rules:
-        4. Remove all diacritics and accents from names.
-        5. Ensure the station_name does not exceed 10 words.
-        6. Translate station-related terms (Terminal, Gare, Rodoviária, etc.) to English.
-        7. AVOID duplicate in the name.
-        8. When the city name appears in both parts, use it ONCE followed by a distinctive landmark, neighborhood, or feature.
-        9. If no distinctive feature exists beyond the city name, use only the city name.
-
-        Examples of INCORRECT formats (DO NOT USE):
-        - "Paris - Paris"
-        - "Foz Do Jordao - Foz Do Jordao"
-        - "Santa Isabel - Santa Isabel"
-        - "São Paulo - Terminal Rodoviário Tietê"
-        - "Cachoeira Do Sul - Centro" (incorrect because remote_name "Parada Vargas" is missing)
-
-        Corresponding examples of CORRECT formats:
-        - "Paris - North Station" (city + landmark)
-        - "Foz Do Jordao" (city name alone when no distinctive feature)
-        - "Santa Isabel - Bus Terminal" (city + feature)
-        - "Sao Paulo - Tiete Bus Terminal"
-        - "Cachoeira Do Sul - Parada Vargas" (city + remote_name)
+        Formatting Rules:
+        4.  Remove all diacritics and accents from all parts of the name.
+        5.  Ensure the final generated name (`pn`) does not exceed 10 words.
+        6.  Don't keep station-related terms (e.g., "Terminal", "Gare", "Rodoviária", "Estación").
+        7.  Avoid including redundant or consecutive duplicate words in the name.
+        8.  Ensure the final generated name (`pn`) is clean and standardized, applying all the above rules.
 
         Here is the data to process:
         {json.dumps(batch_data, indent=2)}
