@@ -56,13 +56,12 @@ st.set_page_config(page_title="🚉 Station Name Processing Tool", layout="wide"
 st.title("🚉 Station Name Processing Tool")
 st.markdown("""
 Welcome to the **Station Name Processing Tool**!  
-This application helps you process and cluster station names efficiently.
+This application helps you create a more suitable station name.
 
 ### 🌟 Features:
-- **📍 Geocoding**: Automatically enrich your data with geographic coordinates.
-- **🤖 AI Naming**: Use AI to suggest standardized station names based on address data.
-- **🗺️ Clustering**: Group similar station names based on location and name similarity.
-- **📝 Review**: Manually review and refine the clusters.
+- **📍 Reverse Geocoding**:  Increase station name precision by integrating relevant address component.
+- **🤖 AI Naming**: Use AI to suggest standardized station names based on remote name and address component.
+- **🗺️ Clustering**: Group similar station names based on coordinates and radius to determine the most relevant station name for each cluster.
 
 At each step, download the results to save your progress and avoid data loss.
 
@@ -71,13 +70,13 @@ At each step, download the results to save your progress and avoid data loss.
 ### 🚀 Instructions:
 1. **Upload your dataset**: Use this page to upload your initial CSV file.
 2. **Follow the steps**: Navigate through the steps using the sidebar:
-   - Geocoding → AI Naming → Clustering → Review.
+   - Reverse geocoding → AI Naming → Clustering.
 3. **Download results**: Save your progress at each step.
 
 """)
 
 # --- File Upload ---
-st.header("📂 1. Upload Data")
+st.header("📂 Reverse Geocoding")
 uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
 
 if uploaded_file is not None:
@@ -97,7 +96,14 @@ if uploaded_file is not None:
         st.write("### Available Columns:")
         st.write(list(df.columns))
 
-        st.info("Your data has been successfully loaded! Use the sidebar to proceed to Step 2: Geocoding.")
+        # Add new requirements section in English
+        st.markdown("""
+        ### Requirements
+        - The dataset must include either coordinates (latitude and longitude) or an address column.
+        - The dataset must include a **remote_name** column.
+        """)
+
+        st.info("Your data has been successfully loaded! Use the sidebar to proceed to Step 1: Reverse Geocoding.")
 
     except Exception as e:
         st.error(f"Error reading file: {e}")
