@@ -68,7 +68,7 @@ At each step, download the results to save your progress and avoid data loss.
 ---
 
 ### 🚀 Instructions:
-1. **Upload your dataset**: Use this page to upload your initial CSV file.
+1. **Upload your dataset**: Use this page to upload your initial CSV file. The file must include at least a remote name, and it is highly recommended to include coordinates.
 2. **Follow the steps**: Navigate through the steps using the sidebar:
    - Reverse geocoding → AI Naming → Clustering.
 3. **Download results**: Save your progress at each step.
@@ -95,14 +95,7 @@ if uploaded_file is not None:
         # Display column names for user to select
         st.write("### Available Columns:")
         st.write(list(df.columns))
-
-        # Add new requirements section in English
-        st.markdown("""
-        ### Requirements
-        - The dataset must include either coordinates (latitude and longitude) or an address column.
-        - The dataset must include a **remote_name** column.
-        """)
-
+        
         st.info("Your data has been successfully loaded! Use the sidebar to proceed to Step 1: Reverse Geocoding.")
 
     except Exception as e:
