@@ -29,7 +29,7 @@ geolocator = Nominatim(user_agent="my_geocoding_app_v2") # Replace/update user_a
 # Using the RateLimiter parameters you had in your code snippet
 geocode = RateLimiter(geolocator.reverse, min_delay_seconds=0.001, max_retries=3, error_wait_seconds=1.0)
 
-def reverse_geocode_dataframe(df, lat_col, lon_col, output_col_address='geocoded_address', output_col_raw='geocoded_address_raw_data'):
+def reverse_geocode_dataframe(df, lat_col, lon_col, output_col_address='geocoded_address', output_col_display_name='geocoded_display_name', output_col_raw='geocoded_address_raw_data'):
     """
     Performs reverse geocoding for a DataFrame using lat/lon columns.
 
@@ -38,6 +38,7 @@ def reverse_geocode_dataframe(df, lat_col, lon_col, output_col_address='geocoded
         lat_col (str): Name of the latitude column.
         lon_col (str): Name of the longitude column.
         output_col_address (str): Name for the new column storing formatted addresses.
+        output_col_display_name (str): Name for the new column storing display_name field.
         output_col_raw (str): Name for the new column storing raw geocoding data.
 
     Returns:
@@ -53,11 +54,14 @@ def reverse_geocode_dataframe(df, lat_col, lon_col, output_col_address='geocoded
     # Ensure columns for results exist on the copy
     if output_col_address not in df_processed.columns:
         df_processed[output_col_address] = None
+    if output_col_display_name not in df_processed.columns:
+        df_processed[output_col_display_name] = None
     if output_col_raw not in df_processed.columns:
          df_processed[output_col_raw] = None
 
     # Ensure columns are object type to store various results (strings, dicts, None)
     df_processed[output_col_address] = df_processed[output_col_address].astype(object)
+    df_processed[output_col_display_name] = df_processed[output_col_display_name].astype(object)
     df_processed[output_col_raw] = df_processed[output_col_raw].astype(object)
 
     # Keeping the start message as in your code
@@ -77,31 +81,35 @@ def reverse_geocode_dataframe(df, lat_col, lon_col, output_col_address='geocoded
                 location = geocode(f"{lat}, {lon}")
                 if location:
                     df_processed.at[index, output_col_address] = location.address
+                    # Store display_name field from raw data if available
+                    if hasattr(location, 'raw') and location.raw and 'display_name' in location.raw:
+                        df_processed.at[index, output_col_display_name] = location.raw['display_name']
+                    else:
+                        df_processed.at[index, output_col_display_name] = location.address
                     # Store raw data as a dictionary, handle cases where it might be None
                     df_processed.at[index, output_col_raw] = location.raw if location.raw is not None else {}
                 else:
                      # Handle cases where geocoding returns no location
                      df_processed.at[index, output_col_address] = "No address found"
+                     df_processed.at[index, output_col_display_name] = "No address found"
                      df_processed.at[index, output_col_raw] = {}
 
             except (GeocoderTimedOut, GeocoderServiceError) as e:
                 # Use .at for setting single values by label
                 df_processed.at[index, output_col_address] = f"Geocoding Error: {e}"
+                df_processed.at[index, output_col_display_name] = f"Geocoding Error: {e}"
                 df_processed.at[index, output_col_raw] = {"error": str(e), "lat": lat, "lon": lon}
-                # Keeping the warning message as in your code
                 st.warning(f"Geocoding failed for row with index {index} ({lat}, {lon}): {e}.")
             except Exception as e:
-                # Catch any other unexpected errors
                 df_processed.at[index, output_col_address] = f"Unexpected Error: {e}"
+                df_processed.at[index, output_col_display_name] = f"Unexpected Error: {e}"
                 df_processed.at[index, output_col_raw] = {"error": str(e), "lat": lat, "lon": lon}
-                # Keeping the error message as in your code
                 st.error(f"An unexpected error occurred during geocoding row with index {index} ({lat}, {lon}): {e}")
-
 
         else:
              # Handle rows with missing lat/lon explicitly
-             # Keeping the messages as in your code
              df_processed.at[index, output_col_address] = "Missing Lat/Lon"
+             df_processed.at[index, output_col_display_name] = "Missing Lat/Lon"
              df_processed.at[index, output_col_raw] = {}
 
         # Update progress bar - Keeping the calculation as in your code
