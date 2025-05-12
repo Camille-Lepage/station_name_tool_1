@@ -107,11 +107,10 @@ def create_prompt_for_format(batch_data, address_col, other_name_cols, prompt_ty
         Steps for Name Construction:
         1.  Identify the city or town or village name from the address structure (e.g., "city", "town").
         2.  Identify any important specific location information from the address structure.
-        3.  Construct the initial station name by combining the identified city/town, specific location, and the `remote_name` according to the following logic:
-          * If the `remote_name` is the same as or a close variation of the identified city/town name, the generated name should be "City/Town Name - Specific Location" (if a distinct specific location was identified in step 2). If no specific location was identified, use just the "City/Town Name".
-          * If the `remote_name` is *not* the same as the identified city/town name, the generated name should integrate the `remote_name` and the city/town name or specific location in a clear and informative way. Prioritize "City/Town Name - Remote Name" if the city/town name is clearly identifiable. Otherwise, use "Specific Location - Remote Name" or simply the "Remote Name" if no other useful distinguishing information is available from the address. Aim for the most intuitive and concise combination.
-
-        Formatting Rules:
+        3.  Construct station name according to the following logic:
+          * If the `remote_name` is the same as or a close variation of the identified city/town name, the generated name should be "remote_name - Specific Location" (if a distinct specific location was identified in step 2).
+          * If the `remote_name` is *not* the same as the identified city/town name, the generated name should be "remote_name - city/town name". 
+          Otherwise, use "remote_name - Specific Location" or simply the "remote Name" if no other useful distinguishing information.
         4.  Remove all diacritics and accents from all parts of the name.
         5.  Ensure the final generated name (`pn`) does not exceed 10 words.
         6.  Don't keep station-related terms (e.g., "Terminal", "Gare", "Rodoviária", "Estación").
@@ -161,9 +160,10 @@ def create_prompt_for_format(batch_data, address_col, other_name_cols, prompt_ty
         Steps for Name Construction:
         1.  Identify the city or town or village name from the address structure (e.g., "city", "town").
         2.  Identify any important specific location information from the address structure (by priority: "suburb", "quarter", "neighbourhood", "amenity"...).
-        3.  Construct the initial station name by combining the identified city/town, specific location, and the `remote_name` according to the following logic:
-          * If the `remote_name` is the same as or a close variation of the identified city/town name, the generated name should be "City/Town Name - Specific Location" (if a distinct specific location was identified in step 2). If no specific location was identified, use just the "City/Town Name".
-          * If the `remote_name` is *not* the same as the identified city/town name, the generated name should integrate the `remote_name` and the city/town name or specific location in a clear and informative way. Prioritize "City/Town Name - Remote Name" if the city/town name is clearly identifiable. Otherwise, use "Specific Location - Remote Name" or simply the "Remote Name" if no other useful distinguishing information is available from the address. Aim for the most intuitive and concise combination.
+        3.  Construct station name according to the following logic:
+          * If the `remote_name` is the same as or a close variation of the identified city/town name, the generated name should be "remote_name - Specific Location" (if a distinct specific location was identified in step 2).
+          * If the `remote_name` is *not* the same as the identified city/town name, the generated name should be "remote_name - city/town name". 
+          Otherwise, use "remote_name - Specific Location" or simply the "remote Name" if no other useful distinguishing information.
 
         Formatting Rules:
         4.  Remove all diacritics and accents from all parts of the name.
