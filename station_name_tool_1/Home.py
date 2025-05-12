@@ -95,7 +95,7 @@ if uploaded_file is not None:
         # Display column names for user to select
         st.write("### Available Columns:")
         st.write(list(df.columns))
-        
+
         st.info("Your data has been successfully loaded! Use the sidebar to proceed to Step 1: Reverse Geocoding.")
 
     except Exception as e:
