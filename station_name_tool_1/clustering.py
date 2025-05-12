@@ -1,410 +1,277 @@
-# pages/3_Clustering.py
-# -*- coding: utf-8 -*-
-import streamlit as st
+# clustering.py
 import pandas as pd
-import io # For download button
+import numpy as np
+import streamlit as st
+from collections import Counter
+from utils import haversine_distance, clean_text
 
-# --- Imports from your modules ---
-from clustering import create_station_clusters, define_cluster_station_names, apply_manual_cluster_names, streamlit_cluster_selection_tabs
-from utils import haversine_distance, clean_text # Needed for clustering logic if referenced directly
+def create_station_clusters(df, lat_col, lon_col, name_col, distance_threshold_m=15):
+    """
+    Creates clusters of stations based on geographic proximity.
+    
+    Args:
+        df (pd.DataFrame): DataFrame containing station data
+        lat_col (str): Name of latitude column
+        lon_col (str): Name of longitude column
+        name_col (str): Name of column containing station names
+        distance_threshold_m (float): Distance threshold in meters
+    
+    Returns:
+        tuple: (DataFrame with cluster_id column, dictionary of {cluster_id: indices})
+    """
+    # Convert distance threshold from meters to kilometers for haversine
+    distance_threshold_km = distance_threshold_m / 1000.0
+    
+    # Create copy of dataframe to avoid modifying the original
+    df_result = df.copy()
+    
+    # Initialize cluster ID column
+    df_result['cluster_id'] = 0
+    
+    # Store indices of rows in each cluster
+    clusters_dict = {}
+    
+    # Convert to numpy arrays for faster access
+    lats = df_result[lat_col].values
+    lons = df_result[lon_col].values
+    
+    # Validate coordinates - skip rows with invalid coordinates
+    valid_coords = ~(np.isnan(lats) | np.isnan(lons))
+    
+    # Current cluster ID
+    current_cluster_id = 1
+    
+    # Process all rows with valid coordinates
+    n_rows = len(df_result)
+    processed = np.zeros(n_rows, dtype=bool)
+    
+    for i in range(n_rows):
+        # Skip if already processed or has invalid coordinates
+        if processed[i] or not valid_coords[i]:
+            continue
+            
+        # Create new cluster with this station
+        cluster_indices = [i]
+        df_result.loc[i, 'cluster_id'] = current_cluster_id
+        processed[i] = True
+        
+        # Reference coordinates
+        ref_lat, ref_lon = lats[i], lons[i]
+        
+        # Find all other points within distance threshold
+        for j in range(n_rows):
+            if j == i or processed[j] or not valid_coords[j]:
+                continue
+                
+            # Calculate distance using haversine formula
+            dist = haversine_distance(ref_lat, ref_lon, lats[j], lons[j])
+            
+            if dist <= distance_threshold_km:
+                # Add to current cluster
+                df_result.loc[j, 'cluster_id'] = current_cluster_id
+                cluster_indices.append(j)
+                processed[j] = True
+        
+        # Store cluster if it has more than one station
+        if len(cluster_indices) > 1:
+            clusters_dict[current_cluster_id] = cluster_indices
+            current_cluster_id += 1
+        else:
+            # Revert single-station "clusters" back to 0
+            df_result.loc[i, 'cluster_id'] = 0
+    
+    return df_result, clusters_dict
 
-# --- Session State Initialization (Needed in every script using state) ---
-# Initialize state variables if they don't exist
-if 'df' not in st.session_state:
-    st.session_state.df = None
-if 'df_geocoded' not in st.session_state:
-    st.session_state.df_geocoded = None
-if 'df_ai_named' not in st.session_state:
-    st.session_state.df_ai_named = None
-if 'df_clustered' not in st.session_state:
-    st.session_state.df_clustered = None
-if 'df_final' not in st.session_state:
-    st.session_state.df_final = None
-if 'clusters_for_review' not in st.session_state:
-    st.session_state.clusters_for_review = {}
-if 'potential_cluster_names' not in st.session_state:
-    st.session_state.potential_cluster_names = {} # Store suggested names per cluster
-if 'manual_cluster_names' not in st.session_state:
-    st.session_state.manual_cluster_names = {} # Store user-edited names
-if 'last_uploaded_filename' not in st.session_state:
-    st.session_state.last_uploaded_filename = "data.csv"
-if 'geocoding_params' not in st.session_state:
-     st.session_state.geocoding_params = {
-         'lat_col': None,
-         'lon_col': None,
-     }
-if 'clustering_params' not in st.session_state:
-    st.session_state.clustering_params = {
-        'name_col': None,
-        'lat_col': None,
-        'lon_col': None,
-        'distance_threshold_m': 15,  # Default to 15 meters
-        'remote_name_col': None,  # Optional column for remote names
-    }
-if 'ai_params' not in st.session_state:
-    st.session_state.ai_params = {
-        'address_col': None,
-        'name_col': None,
-        'other_name_cols': [],
-        'batch_size': 50,
-    }
-if 'selected_address_keys' not in st.session_state: # Also initialize address keys state
-    st.session_state.selected_address_keys = ['road', 'city', 'postcode', 'country'] # Default keys
-if 'clustering_step' not in st.session_state:
-    st.session_state.clustering_step = 1  # Track the current step in the workflow
-if 'needs_manual_review' not in st.session_state:
-    st.session_state.needs_manual_review = False  # Flag to indicate if manual review is needed
-# --- End of Session State Initialization ---
+def define_cluster_station_names(df_clustered, clusters_dict, name_col):
+    """
+    Automatically determines the best name for each cluster based on name containment.
+    Selects longer name only if it contains the shorter name.
 
+    Args:
+        df_clustered (pd.DataFrame): DataFrame with cluster_id column.
+        clusters_dict (dict): Dictionary of {cluster_id: indices}.
+        name_col (str): Column name containing station names.
 
-# Set page configuration
-st.set_page_config(page_title="🚉 Station Name Processing Tool - Clustering", layout="wide")
+    Returns:
+        dict: Dictionary of {cluster_id: suggested_name}.
+    """
+    suggested_names = {}
 
-# Page Title
-st.title("🗺️ 4. Clustering Stations")
-st.markdown("""
-### 🗂️ Group similar stations based on location.
-""")
+    for cluster_id, indices in clusters_dict.items():
+        # Get all names in this cluster
+        names = df_clustered.iloc[indices][name_col].dropna().tolist()
 
-# --- Process Summary ---
-st.markdown("## 🛠️ Process Overview")
-st.markdown("""
-1. **Clustering**: Group stations based on geographic proximity.
-2. **Automatic Naming**: Define common names for each cluster where possible.
-3. **Manual Review** (if needed): Assign names to clusters that couldn't be named automatically.
-4. **Final Dataset**: Download the complete dataset with assigned cluster names.
-""")
-st.markdown("---")
+        if not names:
+            suggested_names[cluster_id] = None
+            continue
 
-# --- Helper function for download button ---
-def create_download_button(df, filename_suffix, key):
-    if df is not None:
-        try:
-            # Use BytesIO to handle the CSV data in memory
-            csv_buffer = io.StringIO()
-            df.to_csv(csv_buffer, index=False)
-            csv_bytes = csv_buffer.getvalue().encode('utf-8')
+        # Clean names for better matching
+        clean_names = [clean_text(name) if isinstance(name, str) else "" for name in names]
+        
+        # Create a dictionary of clean_name: original_name mapping
+        name_mapping = {clean: orig for clean, orig in zip(clean_names, names)}
+        
+        # Count frequency of each cleaned name
+        name_counts = Counter(clean_names)
+        
+        if name_counts:
+            # Get unique names ordered by frequency (highest first)
+            unique_names = sorted(set(clean_names), key=lambda x: name_counts[x], reverse=True)
+            
+            # Start with the most frequent name
+            best_name = unique_names[0]
+            best_count = name_counts[best_name]
+            
+            # Compare with other names that have the same frequency
+            same_freq_names = [name for name in unique_names if name_counts[name] == best_count]
+            
+            if len(same_freq_names) > 1:
+                # Parmi les noms de même fréquence, chercher des relations d'inclusion
+                found_contained = False
+                for name1 in same_freq_names:
+                    for name2 in same_freq_names:
+                        if name1 != name2:
+                            # Vérifie si un nom est contenu dans l'autre
+                            if name1 in name2:  # Si name1 est contenu dans name2
+                                best_name = name2  # Prendre le plus long
+                                found_contained = True
+                                break
+                            elif name2 in name1:  # Si name2 est contenu dans name1
+                                best_name = name1  # Prendre le plus long
+                                found_contained = True
+                                break
+                    if found_contained:
+                        break
+                
+                if not found_contained:
+                    # Si aucune relation d'inclusion n'est trouvée, marquer pour revue manuelle
+                    suggested_names[cluster_id] = None
+                    continue
 
-            download_filename = f"{st.session_state.last_uploaded_filename.split('.')[0]}_{filename_suffix}.csv"
+            suggested_names[cluster_id] = name_mapping[best_name]
+        else:
+            suggested_names[cluster_id] = None
 
-            st.download_button(
-                label=f"Download {filename_suffix.replace('_', ' ').title()} Data",
-                data=csv_bytes,
-                file_name=download_filename,
-                mime="text/csv",
-                key=key
+    return suggested_names
+
+def apply_manual_cluster_names(df, cluster_names_dict):
+    """
+    Applies the manually defined cluster names to the DataFrame.
+    
+    Args:
+        df (pd.DataFrame): DataFrame with cluster_id column
+        cluster_names_dict (dict): Dictionary of {cluster_id: final_name}
+        
+    Returns:
+        pd.DataFrame: DataFrame with final_name column added
+    """
+    # Create a copy to avoid modifying the original
+    result_df = df.copy()
+    
+    # Initialize final_name column
+    result_df['final_name'] = None
+    
+    # Apply cluster names where available
+    for cluster_id, final_name in cluster_names_dict.items():
+        if final_name is not None:
+            # Apply to all rows in this cluster
+            result_df.loc[result_df['cluster_id'] == cluster_id, 'final_name'] = final_name
+    
+    # For unclustered rows (cluster_id = 0) or clusters without a final name,
+    # use the original name from the name column
+    name_col = st.session_state.clustering_params.get('name_col')
+    if name_col and name_col in result_df.columns:
+        # Fill NaN final_name with original name
+        mask = result_df['final_name'].isna()
+        result_df.loc[mask, 'final_name'] = result_df.loc[mask, name_col]
+    
+    return result_df
+
+def streamlit_cluster_selection_tabs(clusters_for_review_dict, original_df, potential_cluster_names, name_col='proposed_name', remote_name_col=None):
+    """
+    Generates Streamlit tabs for reviewing and manually renaming clusters.
+
+    Args:
+        clusters_for_review_dict (dict): {cluster_id: list_of_original_indices} for clusters to review.
+        original_df (pd.DataFrame): The original DataFrame containing necessary columns.
+        potential_cluster_names (dict): {cluster_id: potential_name} dictionary with auto-detected names.
+        name_col (str): The column containing the proposed name.
+        remote_name_col (str, optional): Column containing remote names for reference.
+
+    Returns:
+        dict: {cluster_id: manual_name} with potentially updated names from user input.
+    """
+    st.write("Please review and name the following clusters:")
+
+    # Create a list of cluster IDs to review
+    # Only include clusters that need manual review (None in potential_cluster_names)
+    clusters_needing_review = []
+    for cluster_id, indices in clusters_for_review_dict.items():
+        if cluster_id in potential_cluster_names and potential_cluster_names[cluster_id] is None:
+            clusters_needing_review.append(cluster_id)
+    
+    if not clusters_needing_review:
+        st.info("No clusters need manual review.")
+        return potential_cluster_names  # Return existing names
+
+    # Sort cluster IDs for consistent tab order
+    clusters_needing_review.sort()
+
+    # Create tabs
+    tabs = st.tabs([f"Cluster {cid}" for cid in clusters_needing_review])
+
+    manual_cluster_names = potential_cluster_names.copy()
+
+    for i, cluster_id in enumerate(clusters_needing_review):
+        with tabs[i]:
+            st.write(f"Details for Cluster {cluster_id}")
+
+            original_indices = clusters_for_review_dict[cluster_id]
+            # Select rows from the original DataFrame using the original indices
+            cluster_df = original_df.loc[original_indices]
+
+            if cluster_df.empty:
+                st.warning(f"No data found for cluster {cluster_id}.")
+                manual_cluster_names[cluster_id] = ""
+                continue
+
+            # Get all proposed names in this cluster
+            display_cols = ['cluster_id', name_col]
+            if remote_name_col and remote_name_col in cluster_df.columns:
+                display_cols.append(remote_name_col)
+            
+            # Add other useful columns if they exist
+            optional_cols = ['geocoded_address', 'geocoded_address_raw_data', 'explanation']
+            display_cols += [col for col in optional_cols if col in cluster_df.columns]
+            
+            # Show all stations in this cluster
+            st.dataframe(cluster_df[display_cols])
+
+            # Get unique proposed names from this cluster for reference
+            unique_names = cluster_df[name_col].dropna().unique().tolist()
+            
+            if unique_names:
+                st.write("Available names in this cluster:")
+                for name in unique_names:
+                    st.write(f"- {name}")
+            
+            # Direct text input field (no radio button selection first)
+            custom_name = st.text_input(
+                "Enter name for this cluster:",
+                value="",
+                key=f"manual_name_{cluster_id}"
             )
-        except Exception as e:
-            st.error(f"Error preparing download file: {e}")
-
-
-# --- MAIN UI CONTENT ---
-
-# --- Select which dataset to use for clustering ---
-st.markdown("### 📂 Select Dataset for Clustering")
-available_datasets = []
-dataset_labels = []
-
-if st.session_state.df is not None:
-    available_datasets.append("df")
-    dataset_labels.append("Reverse Geocoding data")
-    
-if st.session_state.df_geocoded is not None:
-    available_datasets.append("df_geocoded")
-    dataset_labels.append("Geocoded data")
-    
-if st.session_state.df_ai_named is not None:
-    available_datasets.append("df_ai_named")
-    dataset_labels.append("AI Named data")
-
-# Only show dataset selection if multiple options are available
-if len(available_datasets) > 1:
-    selected_dataset = st.selectbox(
-        "Select dataset to use for clustering:",
-        options=range(len(available_datasets)),
-        format_func=lambda x: dataset_labels[x]
-    )
-    df_for_clustering = st.session_state[available_datasets[selected_dataset]].copy()
-    st.write(f"Using {dataset_labels[selected_dataset]} for clustering")
-elif len(available_datasets) == 1:
-    df_for_clustering = st.session_state[available_datasets[0]].copy()
-    st.write(f"Using {dataset_labels[0]} for clustering")
-else:
-    st.warning("Please complete Step 1: Reverse Geocoding first on the Home page.")
-    st.stop()  # Stop execution if no dataset is available
-
-
-# --- STEP 1: Configure Parameters and Run Clustering ---
-if st.session_state.clustering_step == 1:
-    st.markdown("### ⚙️ Step 1: Configure Clustering Parameters")
-
-    name_col_cluster = st.selectbox(
-        "Select Name Column for Clustering",
-        list(df_for_clustering.columns),
-        index=(
-            list(df_for_clustering.columns).index('proposed_name')
-            if 'proposed_name' in df_for_clustering.columns
-            else next((i for i, col in enumerate(df_for_clustering.columns) if 'name' in col.lower()), 0)
-        ),
-        key="name_col_cluster_page3"
-    )
-
-    lat_col_cluster = st.selectbox(
-        "Select Latitude Column for Clustering",
-        list(df_for_clustering.columns),
-        index=(
-            list(df_for_clustering.columns).index('latitude')
-            if 'latitude' in df_for_clustering.columns
-            else next((i for i, col in enumerate(df_for_clustering.columns) if 'lat' in col.lower()), 0)
-        ),
-        key="lat_col_cluster_page3"
-    )
-
-    lon_col_cluster = st.selectbox(
-        "Select Longitude Column for Clustering",
-        list(df_for_clustering.columns),
-        index=(
-            list(df_for_clustering.columns).index('longitude')
-            if 'longitude' in df_for_clustering.columns
-            else next((i for i, col in enumerate(df_for_clustering.columns) if 'lng' in col.lower() or 'lng' in col.lower()), 0)
-        ),
-        key="lon_col_cluster_page3"
-    )
-
-    remote_name_col = st.selectbox(
-        "Select Remote Name Column (Optional, for reference only)",
-        ["None"] + list(df_for_clustering.columns),
-        index=(
-            1 + list(df_for_clustering.columns).index('remote_name')
-            if 'remote_name' in df_for_clustering.columns
-            else next((1 + i for i, col in enumerate(df_for_clustering.columns) if 'name' in col.lower()), 0)
-        ),
-        key="remote_name_col_page3"
-    )
-    if remote_name_col == "None":
-        remote_name_col = None
-
-    distance_threshold_m = st.number_input(
-        "Distance Threshold (meters)", 
-        min_value=1, 
-        max_value=2000, 
-        value=st.session_state.clustering_params.get('distance_threshold_m', 15), 
-        step=1, 
-        key="distance_threshold_m_page3"
-    )
-
-   # Update session state with all parameters
-    st.session_state.clustering_params['name_col'] = name_col_cluster
-    st.session_state.clustering_params['lat_col'] = lat_col_cluster
-    st.session_state.clustering_params['lon_col'] = lon_col_cluster
-    st.session_state.clustering_params['distance_threshold_m'] = distance_threshold_m
-    st.session_state.clustering_params['remote_name_col'] = remote_name_col
-
-
-    # --- Run Clustering Button ---
-    if st.button("Run Clustering", key="run_clustering_button_page3"):
-        if name_col_cluster and lat_col_cluster and lon_col_cluster:
-            # Show a spinner while clustering is running
-            with st.spinner("Clustering in progress..."):
-                # Call the clustering function with all parameters
-                df_clustered_result, clusters_dict = create_station_clusters(
-                    df_for_clustering.copy(),
-                    lat_col_cluster,
-                    lon_col_cluster,
-                    name_col_cluster,
-                    distance_threshold_m
-                )
-
-                st.session_state.df_clustered = df_clustered_result
-                st.session_state.clusters_for_review = clusters_dict
-
-                if st.session_state.df_clustered is not None:
-                    st.success(f"Clustering complete! Found {len(st.session_state.clusters_for_review)} potential clusters.")
-
-                    # Automatically run the automatic naming process
-                    with st.spinner("Automatically defining cluster names..."):
-                        st.session_state.potential_cluster_names = define_cluster_station_names(
-                            st.session_state.df_clustered,
-                            st.session_state.clusters_for_review,
-                            name_col_cluster
-                        )
-
-                        # Initialize manual names with potential names
-                        st.session_state.manual_cluster_names = st.session_state.potential_cluster_names.copy()
-
-                        # Check if manual review is needed
-                        manual_review_needed = [name for name in st.session_state.potential_cluster_names.values() if name is None]
-                        manual_review_count = len(manual_review_needed)
-
-                        if manual_review_count > 0:
-                            st.session_state.needs_manual_review = True
-                            st.success(f"Automatic naming complete! {manual_review_count} clusters need manual review.")
-                        else:
-                            st.session_state.needs_manual_review = False
-                            st.success("All clusters were automatically named! No manual review needed.")
-
-                            # Apply the names automatically since no manual review is needed
-                            st.session_state.df_final = apply_manual_cluster_names(
-                                st.session_state.df_clustered.copy(),
-                                st.session_state.manual_cluster_names
-                            )
-
-                # Move to the next step
-                st.session_state.clustering_step = 2
-                st.rerun()  # Changed from experimental_rerun to rerun
-        else:
-            st.warning("Please select Name, Latitude, and Longitude columns for clustering.")
-
-
-# --- STEP 2: Show Results and Manual Review if Needed ---
-elif st.session_state.clustering_step == 2:
-    st.markdown("### 📊 Step 2: Review Clustering Results")
-    if st.session_state.df_clustered is not None:
-        # Create a container for the statistics section
-        stats_container = st.container()
-        
-        with stats_container:
-            st.subheader("Clustering Results")
             
-            # Calculate statistics
-            total_rows = len(st.session_state.df_clustered)
-            clustered_rows = st.session_state.df_clustered[st.session_state.df_clustered['cluster_id'] > 0].shape[0]
-            unclustered_rows = total_rows - clustered_rows
-            
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Total Stations", total_rows)
-            col2.metric("Clustered Stations", clustered_rows)
-            col3.metric("Unclustered Stations", unclustered_rows)
-        
-        # Show automatically named clusters
-        auto_named_clusters = {k: v for k, v in st.session_state.potential_cluster_names.items() 
-                              if v is not None}
-        
-        if auto_named_clusters:
-            st.subheader("Automatically Named Clusters")
-            
-            # Prepare the data for display
-            auto_named_df = st.session_state.df_clustered.copy()
-            auto_named_df = auto_named_df[auto_named_df['cluster_id'].isin(auto_named_clusters.keys())]
-            auto_named_df['auto_suggested_name'] = auto_named_df['cluster_id'].map(auto_named_clusters)
-            display_cols = ['cluster_id', st.session_state.clustering_params['remote_name_col'], 
-                            st.session_state.clustering_params['name_col'], 'auto_suggested_name']
-            display_cols = [col for col in display_cols if col in auto_named_df.columns]
-            auto_named_df = auto_named_df[display_cols]
+            # Store the entered name
+            if custom_name.strip():
+                manual_cluster_names[cluster_id] = custom_name
+            else:
+                # If no custom name is provided but there are unique names, suggest the first one
+                if unique_names:
+                    manual_cluster_names[cluster_id] = unique_names[0]
+                    st.info(f"Using '{unique_names[0]}' as default name. Edit the field above to change it.")
+                else:
+                    manual_cluster_names[cluster_id] = f"Cluster {cluster_id}"
+                    st.info(f"Using 'Cluster {cluster_id}' as default name. Edit the field above to change it.")
 
-            # Display the table using st.dataframe
-            st.dataframe(auto_named_df)
-        else:
-            st.info("No automatically named clusters available.")
-
-        # Check if manual review is needed
-        if st.session_state.needs_manual_review:
-            st.subheader("Step 2: Manual Cluster Name Review")
-            
-            # Only display clusters that need manual review
-            manual_review_needed = {
-                k: v for k, v in st.session_state.clusters_for_review.items() 
-                if k in st.session_state.potential_cluster_names and st.session_state.potential_cluster_names[k] is None
-            }
-            
-            # Display the simplified cluster selection interface with checkboxes and text inputs
-            for cluster_id, station_indices in manual_review_needed.items():
-                name_col = st.session_state.clustering_params['name_col']
-                remote_name_col = st.session_state.clustering_params['remote_name_col']
-                
-                st.markdown(f"#### Cluster {cluster_id}")
-                selected_name = None
-                
-                # Create a DataFrame for just this cluster's stations
-                cluster_stations = st.session_state.df_clustered.iloc[station_indices]
-                station_names = []
-                
-                # Display each station's names
-                for _, station in cluster_stations.iterrows():
-                    station_info = f"{station[name_col]}"
-                    if remote_name_col and pd.notna(station[remote_name_col]):
-                        station_info = f"{station[name_col]} (Remote: {station[remote_name_col]})"
-                    
-                    if st.checkbox(f"Select: {station_info}", key=f"checkbox_{cluster_id}_{station[name_col]}"):
-                        selected_name = station[name_col]
-
-                # Allow custom name input
-                custom_name = st.text_input(
-                    f"Or enter a custom name for this cluster:",
-                    value="",
-                    key=f"custom_name_{cluster_id}"
-                )
-
-                # Update manual cluster names based on selection
-                if selected_name:
-                    st.session_state.manual_cluster_names[cluster_id] = selected_name
-                elif custom_name:
-                    st.session_state.manual_cluster_names[cluster_id] = custom_name
-            
-            # Button to apply manual names
-            if st.button("Apply All Selections", key="apply_manual_names_button"):
-                if st.session_state.df_clustered is not None and st.session_state.manual_cluster_names:
-                    with st.spinner("Applying manual names to clusters..."):
-                        # Merge automatic names with manual names
-                        final_names = st.session_state.potential_cluster_names.copy()
-                        for k, v in st.session_state.manual_cluster_names.items():
-                            if v is not None:  # Only update if a value was entered
-                                final_names[k] = v
-
-                        st.session_state.df_final = apply_manual_cluster_names(
-                            st.session_state.df_clustered.copy(),
-                            final_names
-                        )
-
-                        if st.session_state.df_final is not None:
-                            st.success("Manual names applied successfully!")
-                            # Move to the final step
-                            st.session_state.clustering_step = 3
-                            st.rerun()
-
-        else:
-            # If no manual review is needed, show the final dataset and download button
-            st.success("All clusters were automatically named! No manual review needed.")
-            st.session_state.df_final = apply_manual_cluster_names(
-                st.session_state.df_clustered.copy(),
-                st.session_state.manual_cluster_names
-            )
-
-            if st.session_state.df_final is not None:
-                st.subheader("Final Dataset")
-                display_cols = ['cluster_id', st.session_state.clustering_params['name_col'], 'final_name']
-                display_cols = [col for col in display_cols if col in st.session_state.df_final.columns]
-                st.dataframe(st.session_state.df_final[display_cols])
-
-                # Add download button
-                create_download_button(st.session_state.df_final, "final_named", "download_final")
-
-                # Option to restart the process
-                if st.button("Restart Clustering Process", key="restart_process"):
-                    st.session_state.clustering_step = 1
-                    st.rerun()
-    else:
-        st.error("No clustered data available. Please run clustering first.")
-
-
-# --- STEP 3: Final Results and Download ---
-elif st.session_state.clustering_step == 3:
-    st.markdown("### ✅ Step 3: Final Results and Download")
-    
-    name_col_cluster = st.session_state.clustering_params.get('name_col')
-    
-    if st.session_state.df_final is not None:
-        # Show preview of final dataset
-        display_cols = ['cluster_id', name_col_cluster, 'final_name']
-        display_cols = [col for col in display_cols if col in st.session_state.df_final.columns]
-        st.dataframe(st.session_state.df_final[display_cols])
-        
-        # Download button
-        create_download_button(st.session_state.df_final, "final_named", "download_final")
-        
-        # Option to restart the process
-        if st.button("Restart Clustering Process", key="restart_process"):
-            st.session_state.clustering_step = 1
-            st.rerun()  # Changed from experimental_rerun to rerun
-    else:
-        st.error("Final dataset not available.")
+    return manual_cluster_names
