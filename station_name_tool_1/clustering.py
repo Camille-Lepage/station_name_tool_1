@@ -362,10 +362,29 @@ elif st.session_state.clustering_step == 2:
                             st.session_state.clustering_step = 3
                             st.rerun()
 
+        else:
+            # If no manual review is needed, show the final dataset and download button
+            st.success("All clusters were automatically named! No manual review needed.")
+            st.session_state.df_final = apply_manual_cluster_names(
+                st.session_state.df_clustered.copy(),
+                st.session_state.manual_cluster_names
+            )
+
+            if st.session_state.df_final is not None:
+                st.subheader("Final Dataset")
+                display_cols = ['cluster_id', st.session_state.clustering_params['name_col'], 'final_name']
+                display_cols = [col for col in display_cols if col in st.session_state.df_final.columns]
+                st.dataframe(st.session_state.df_final[display_cols])
+
+                # Add download button
+                create_download_button(st.session_state.df_final, "final_named", "download_final")
+
+                # Option to restart the process
+                if st.button("Restart Clustering Process", key="restart_process"):
+                    st.session_state.clustering_step = 1
+                    st.rerun()
     else:
-        # Already have final dataset from automatic naming
-        st.session_state.clustering_step = 3
-        st.rerun()  # Changed from experimental_rerun to rerun
+        st.error("No clustered data available. Please run clustering first.")
 
 
 # --- STEP 3: Final Results and Download ---
