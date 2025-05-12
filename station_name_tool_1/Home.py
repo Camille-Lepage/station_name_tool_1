@@ -89,7 +89,7 @@ if uploaded_file is not None:
 
         # Display the first 5 rows and columns
         st.write("### Preview of Uploaded Data:")
-        st.dataframe(df.head())
+        st.dataframe(df)
         st.write(f"**Shape:** {df.shape[0]} rows × {df.shape[1]} columns")
 
         # Display column names for user to select
