@@ -339,8 +339,9 @@ def process_stations_with_gemini(df, api_key, address_col, name_col, other_name_
     result_df['proposed_name'] = None
 
     total_batches = ceil(len(batch_df) / batch_size)
+    total_rows = len(batch_df)
     st.write(f"Starting AI processing in {total_batches} batches...")
-    progress_bar = st.progress(0)
+    progress_bar = st.progress(0, text="AI Naming in progress...")
 
     processed_count = 0
 
@@ -353,12 +354,6 @@ def process_stations_with_gemini(df, api_key, address_col, name_col, other_name_
         for j, item in enumerate(batch_data):
             item['original_name'] = item.get(name_col)
             item['original_index'] = j  # Store batch position index
-
-        # Use a temporary placeholder for the batch log
-        batch_log_placeholder = st.empty()
-        batch_log_placeholder.info(f"Processing batch {i // batch_size + 1}/{total_batches}...")
-        time.sleep(4)  # Keep the log visible for 4 seconds
-        batch_log_placeholder.empty()  # Clear the log
 
         results = process_batch_with_gemini(
             model,
@@ -378,8 +373,8 @@ def process_stations_with_gemini(df, api_key, address_col, name_col, other_name_
 
                 if batch_idx is not None and proposed_name is not None:
                     # Get the original DataFrame index
-                    df_idx = i + batch_idx  # Calcule d'abord l'index dans le DataFrame temporaire
-                    original_idx = index_map.get(df_idx)  # Puis cherche l'index original
+                    df_idx = i + batch_idx  # Calculate index in the temporary DataFrame
+                    original_idx = index_map.get(df_idx)  # Map to the original index
                     if original_idx is not None:
                         # Update the result DataFrame
                         result_df.loc[original_idx, 'proposed_name'] = proposed_name
@@ -388,13 +383,12 @@ def process_stations_with_gemini(df, api_key, address_col, name_col, other_name_
             # Handle case where a batch completely failed
             st.warning(f"Batch {i // batch_size + 1} failed to return results.")
 
-        # Update progress
-        progress = (i + batch_size) / len(batch_df)  # Use batch end index for progress
-        progress_bar.progress(min(progress, 1.0))  # Ensure progress doesn't exceed 100%
+        # Update progress bar with processed count
+        progress_bar.progress(processed_count / total_rows, text=f"AI Naming: {processed_count}/{total_rows}")
 
         time.sleep(1)  # Small delay between batches
 
-    progress_bar.empty()
+    progress_bar.progress(1.0, text="AI Naming completed!")  # Ensure it reaches 100% at the end
     st.write(f"AI processing finished. Successfully processed {processed_count} items.")
 
     return result_df
