@@ -66,8 +66,14 @@ def reverse_geocode_dataframe(df, lat_col, lon_col, output_col_address='geocoded
 
     # Keeping the start message as in your code
     st.write("Starting reverse geocoding...")
-    progress_bar = st.progress(0)
+    # Initialize progress bar with text
+    progress_bar = st.progress(0, text="Geocoding in progress...")
     total_rows = len(df_processed)
+
+    # Progress callback function
+    def update_progress(current, total):
+        progress = current / total
+        progress_bar.progress(progress, text=f"Geocoding: {current}/{total}")
 
     # Iterate over the copied DataFrame
     for index, row in df_processed.iterrows():
@@ -77,25 +83,19 @@ def reverse_geocode_dataframe(df, lat_col, lon_col, output_col_address='geocoded
         # Ensure lat/lon are not NaN or None before attempting geocoding
         if pd.notna(lat) and pd.notna(lon):
             try:
-                # Use .at for setting single values by label for efficiency
                 location = geocode(f"{lat}, {lon}")
                 if location:
                     df_processed.at[index, output_col_address] = location.address
-                    # Store display_name field from raw data if available
                     if hasattr(location, 'raw') and location.raw and 'display_name' in location.raw:
                         df_processed.at[index, output_col_display_name] = location.raw['display_name']
                     else:
                         df_processed.at[index, output_col_display_name] = location.address
-                    # Store raw data as a dictionary, handle cases where it might be None
                     df_processed.at[index, output_col_raw] = location.raw if location.raw is not None else {}
                 else:
-                     # Handle cases where geocoding returns no location
-                     df_processed.at[index, output_col_address] = "No address found"
-                     df_processed.at[index, output_col_display_name] = "No address found"
-                     df_processed.at[index, output_col_raw] = {}
-
+                    df_processed.at[index, output_col_address] = "No address found"
+                    df_processed.at[index, output_col_display_name] = "No address found"
+                    df_processed.at[index, output_col_raw] = {}
             except (GeocoderTimedOut, GeocoderServiceError) as e:
-                # Use .at for setting single values by label
                 df_processed.at[index, output_col_address] = f"Geocoding Error: {e}"
                 df_processed.at[index, output_col_display_name] = f"Geocoding Error: {e}"
                 df_processed.at[index, output_col_raw] = {"error": str(e), "lat": lat, "lon": lon}
@@ -105,25 +105,14 @@ def reverse_geocode_dataframe(df, lat_col, lon_col, output_col_address='geocoded
                 df_processed.at[index, output_col_display_name] = f"Unexpected Error: {e}"
                 df_processed.at[index, output_col_raw] = {"error": str(e), "lat": lat, "lon": lon}
                 st.error(f"An unexpected error occurred during geocoding row with index {index} ({lat}, {lon}): {e}")
-
         else:
-             # Handle rows with missing lat/lon explicitly
-             df_processed.at[index, output_col_address] = "Missing Lat/Lon"
-             df_processed.at[index, output_col_display_name] = "Missing Lat/Lon"
-             df_processed.at[index, output_col_raw] = {}
+            df_processed.at[index, output_col_address] = "Missing Lat/Lon"
+            df_processed.at[index, output_col_display_name] = "Missing Lat/Lon"
+            df_processed.at[index, output_col_raw] = {}
 
-        # Update progress bar - Keeping the calculation as in your code
-        # Ensure index is compatible with get_loc if the index is not standard RangeIndex
-        try:
-            current_pos = df_processed.index.get_loc(index) + 1
-        except KeyError:
-            # Fallback if index is not found (shouldn't happen with iterrows)
-            current_pos = index + 1 # Assuming index is numeric if get_loc fails
-        progress = current_pos / total_rows
-        progress_bar.progress(min(progress, 1.0)) # Ensure progress doesn't exceed 1.0
+        # Update progress bar
+        update_progress(index + 1, total_rows)
 
-
-    progress_bar.empty() # Hide the progress bar when done
-    # Keeping the finish message as in your code
+    progress_bar.progress(1.0, text="Geocoding completed!")  # Ensure it reaches 100% at the end
     st.write("Reverse geocoding finished.")
     return df_processed # Return the modified copy
