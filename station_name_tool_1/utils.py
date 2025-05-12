@@ -10,8 +10,7 @@ def clean_text(text):
     if not isinstance(text, str):
         return ""
     text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8', 'ignore')
-    text = text.lower()
-    text = re.sub(r'[^a-z0-9\s]', '', text) # Keep spaces for now
+    text = re.sub(r'[^a-zA-Z0-9\s]', '', text) # Keep spaces for now
     text = text.strip() # Remove leading/trailing spaces
     # Optional: Replace multiple spaces with a single space
     text = re.sub(r'\s+', ' ', text)
