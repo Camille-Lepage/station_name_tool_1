@@ -181,28 +181,15 @@ if prompt_type == "Custom Prompt":
     with st.expander("Custom Prompt Example (Click to expand)"):
         st.markdown("### Example Nominatim Prompt")
         st.code("""
-        Analyze the following structured address data and associated remote names to determine the best single, standardized name (`pn`) for each transportation station.
+        Analyze the following structured address data and remote names to determine the best name (`pn`) for each transportation station.
 
-        Context: These data represent transportation stations (bus, train, etc.) in different languages and countries. Your task is to generate a clean, consistent English name for each station based on the provided information and the following rules.
-
-        Goal: For each station, generate a single, standardized name (`pn`) that is informative, concise, and adheres to all rules.
-
-        For each station, apply the following steps and formatting rules:
-
-        Steps for Name Construction:
-        1.  Identify the city or town or village name from the address structure (e.g., "city", "town").
-        2.  Identify any important specific location information from the address structure (by priority: "suburb", "quarter", "neighbourhood", "borough", "amenity", ...).
-        3.  Construct station name according to the following logic:
-          * If the `remote_name` is the same as or a close variation of the identified city/town name, the generated name should be "remote_name - Specific Location" (if a distinct specific location was identified in step 2).
-          * If the `remote_name` is *not* the same as the identified city/town name, the generated name should be "remote_name - city/town name". 
-          Otherwise, use "remote_name - Specific Location" or simply the "remote Name" if no other useful distinguishing information.
-
-        Formatting Rules:
-        4.  Remove all diacritics and accents from all parts of the name.
-        5.  Ensure the final generated name (`pn`) does not exceed 10 words.
-        6.  Don't keep station-related terms (e.g., "Terminal", "Gare", "Rodoviária", "Estación").
-        7.  Avoid including redundant or consecutive duplicate words in the name.
-        8.  Ensure the final generated name (`pn`) is clean and standardized, applying all the above rules.
+        1. IMPORTANT : AVOID word duplication in the name (`pn`), If a word in the address key is the same as a word in the remote name, consider them similair, choose another adress key. So the name is not redundant. 
+        2. Combine the remote_name with a relevant address component that is address key that is NOT similar
+           and is contextually suitable (By priority: 1. town, 2. city, 3. village, 4. suburb, 5. neighbourhood), (eg. Center is a good adress value for the name).
+           If no suitable address component is available, use only the remote_name
+        3.  Remove all diacritics and accents from all parts of the name.
+        4.  Ensure the final generated name (pn) does not exceed 10 words.
+        5.  Don't keep station-related terms (e.g., "Terminal", "Gare", "Rodoviária", "Estación", ”station”)
 
 Here is the data to process:
 {batch_data}
