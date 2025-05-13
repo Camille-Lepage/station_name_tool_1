@@ -56,7 +56,7 @@ st.set_page_config(page_title="🚉 Station Name Processing Tool", layout="wide"
 st.title("🚉 Station Name Processing Tool")
 st.markdown("""
 Welcome to the **Station Name Processing Tool**!  
-This application helps you create a more suitable station name.
+This application helps you create a more informative and accurate station name.
 
 ### 🌟 Features:
 - **📍 Reverse Geocoding**:  Increase station name precision by integrating relevant address component.
