@@ -142,6 +142,7 @@ def create_prompt_for_format(batch_data, address_col, other_name_cols, prompt_ty
         3.  Remove all diacritics and accents from all parts of the name.
         4.  Ensure the final generated name (pn) does not exceed 10 words.
         5.  Don't keep station-related terms (e.g., "Terminal", "Gare", "Rodoviária", "Estación", ”station”)
+        
         Here is the data to process:
         {json.dumps(batch_data, indent=2)}
 
