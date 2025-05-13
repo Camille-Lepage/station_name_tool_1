@@ -50,12 +50,12 @@ if 'selected_address_keys' not in st.session_state: # Also initialize address ke
 
 
 # Set page configuration (This applies to all pages, but set it here)
-st.set_page_config(page_title="🚉 Station Name Processing Tool", layout="wide")
+st.set_page_config(page_title="🤖 AI StationNaming Tool", layout="wide")
 
 # Display title and intro for Home page
-st.title("🚉 Station Name Processing Tool")
+st.title("🚉 AI StationNaming")
 st.markdown("""
-Welcome to the **Station Name Processing Tool**!  
+Welcome to the **AI StationNaming Tool**!  
 This application helps you create a more informative and accurate station name.
 
 ### 🌟 Features:
