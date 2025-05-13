@@ -183,7 +183,7 @@ if prompt_type == "Custom Prompt":
         st.code("""
         Analyze the following structured address data and remote names to determine the best name (`pn`) for each transportation station.
 
-        1. IMPORTANT : AVOID word duplication in the name (`pn`), If a word in the address key is the same as a word in the remote name, consider them similair, choose another adress key. So the name is not redundant. 
+        1. IMPORTANT : AVOID word duplication in the name (`pn`), If a word in the address key is the same as a word in the remote name, consider adress key similair to remote_name, choose another adress key. So the name is not redundant. 
         2. Combine the remote_name with a relevant address component that is address key that is NOT similar
            and is contextually suitable (By priority: 1. town, 2. city, 3. village, 4. suburb, 5. neighbourhood), (eg. Center is a good adress value for the name).
            If no suitable address component is available, use only the remote_name
