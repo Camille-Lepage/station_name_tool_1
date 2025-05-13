@@ -76,7 +76,7 @@ At each step, download the results to save your progress and avoid data loss.
 """)
 
 # --- File Upload ---
-st.header("📂 Reverse Geocoding")
+st.header("📂 File Upload")
 uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
 
 if uploaded_file is not None:
