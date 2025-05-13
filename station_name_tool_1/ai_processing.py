@@ -97,14 +97,12 @@ def create_prompt_for_format(batch_data, address_col, other_name_cols, prompt_ty
         # Improved prompt for Maps API (plain text addresses)
         prompt = """
         Analyze the following structured address data and remote names to determine the best name (`pn`) for each transportation station.
-
         1. IMPORTANT : AVOID word duplication in the name (`pn`), If a word in an address component is the same as a word in the remote name, consider the address component similar to the remote name and choose a different address component.
-        2. Combine the remote_name with a relevant address component that is NOT similar and is contextually suitable (By priority: 1. town, 2. city, 3. village, 4. suburb, 5. neighbourhood, etc.), (eg. Center is a good adress component for the name).
+        2. Combine the remote_name with a relevant address component that is NOT similar and is contextually suitable (By priority: 1. town, 2. city, 3. village, 4. suburb, 5. neighbourhood, etc.), (e.g., Center is a good adress component for the name).
            If no suitable address component is available, use only the remote_name.
         3.  Remove all diacritics and accents from all parts of the name.
         4.  Ensure the final generated name (pn) does not exceed 10 words.
         5.  Don't keep station-related terms (e.g., "Terminal", "Gare", "Rodoviária", "Estación", ”station”)
-
         Here is the data to process:
         """
 
@@ -138,21 +136,18 @@ def create_prompt_for_format(batch_data, address_col, other_name_cols, prompt_ty
         # Prompt for Nominatim (structured addresses)
         prompt = f"""
         Analyze the following structured address data and remote names to determine the best name (`pn`) for each transportation station.
-
-        1. IMPORTANT : AVOID word duplication in the name (`pn`), If a word in the address key is the same as a word in the remote name, consider adress key similair to remote_name, choose another adress key. So the name is not redundant. 
-        2. Combine the remote_name with a relevant address component that is address key that is NOT similar
-           and is contextually suitable (By priority: 1. town, 2. city, 3. village, 4. suburb, 5. neighbourhood), (eg. Center is a good adress value for the name).
-           If no suitable address component is available, use only the remote_name
+        1. IMPORTANT : AVOID word duplication in the name (`pn`), If a word in an address component is the same as a word in the remote name, consider the address component similar to the remote name and choose a different address component.
+        2. Combine the remote_name with a relevant address component that is NOT similar and is contextually suitable (By priority: 1. town, 2. city, 3. village, 4. suburb, 5. neighbourhood, etc.), (e.g., Center is a good adress component for the name).
+           If no suitable address component is available, use only the remote_name.
         3.  Remove all diacritics and accents from all parts of the name.
         4.  Ensure the final generated name (pn) does not exceed 10 words.
         5.  Don't keep station-related terms (e.g., "Terminal", "Gare", "Rodoviária", "Estación", ”station”)
-
         Here is the data to process:
         {json.dumps(batch_data, indent=2)}
 
         Return the result as a JSON array of objects. Each object must have the following keys:
         - oi: The original index of the station in the input list (used for mapping back to the DataFrame).
-        - pn: The single, clean, and standardized name you propose based on the address and other available names.
+        - pn: The single, clean, and standardized name you propose.
 
         Ensure the output is ONLY the JSON array. Do not include any other text before or after the JSON.
         ```json
