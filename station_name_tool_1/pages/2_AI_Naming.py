@@ -182,12 +182,50 @@ if prompt_type == "Custom Prompt":
         st.markdown("### Example Nominatim Prompt")
         st.code("""
         Analyze the following structured address data and remote names to determine the best name (`pn`) for each transportation station.
-        1. IMPORTANT : AVOID word duplication in the name (`pn`), If a word in an address component is the same as a word in the remote name, consider the address component similar to the remote name and choose a different address component.
-        2. Combine the remote_name with a relevant address component that is NOT similar and is contextually suitable (By priority: 1. town, 2. city, 3. village, 4. suburb, 5. neighbourhood, etc.), (e.g., Center is a good adress component for the name).
-           If no suitable address component is available, use only the remote_name.
-        3.  Remove all diacritics and accents from all parts of the name.
-        4.  Ensure the final generated name (pn) does not exceed 10 words.
-        5.  Don't keep station-related terms (e.g., "Terminal", "Gare", "Rodoviária", "Estación", ”station”)
+
+        1. AVOID word duplication in the name (`pn`). If a word in an address component is the same as or similar to a word in the remote_name, choose a different address component.
+        2. Combine the remote_name with a relevant address component that is NOT similar and is contextually suitable (By priority: 1. town, 2. city, 3. village, 4. suburb, 5. neighbourhood, etc.). If no suitable address component is available, use only the remote_name.
+        3. Remove all diacritics and accents from all parts of the name.
+        4. The remote_name should ALWAYS be included in the final name, unless there is a specific conflict.
+        5. Ensure the final generated name (pn) does not exceed 10 words.
+        6. Don't keep station-related terms (e.g., "Terminal", "Gare", "Rodoviária", "Estación", ”station”).
+
+        EXAMPLES:
+
+        Example 1:
+        remote_name": "Arroio do Sal",
+        "geocoded_address": "suburb": "Centro", "neighbourhood": "Novo Arroio do Sal", "town": "Arroio do Sal"
+        The name should not be "Arroio do Sal Novo Arroio do Sal" because "Novo Arroio do Sal" is similar to "Arroio do Sal" so it creates word duplication. It should be "Arroio do Sal Centro".
+        
+        Example 2:
+        "remote_name": "Carapebus",
+        "geocoded_address": "town": "Carapebus", "village": "Ubás"
+        The name should not be just "Carapebus" because it ignores the suitable address component "Ubás". It should be "Carapebus Ubas".
+
+        Example 3:
+        "remote_name": "Shopping Estrada",
+        "geocoded_address": "suburb": "Parque Rodoviário", "city": "Campos dos Goytacazes"
+        The name should not be "Shopping Estrada Parque Rodoviario" because city has higher priority than suburb. It should be "Shopping Estrada Campos dos Goytacazes".
+
+        Example 4:
+        "remote_name": "Vila Mirim",
+        "geocoded_address": "suburb": "Mirim", "city": "Praia Grande"
+        The name should not be "Vila Mirim Mirim" because "Mirim" is similar to "Vila Mirim". It should be "Vila Mirim Praia Grande".
+
+        Example 5:
+        "remote_name": "Jericoacoara",
+        "geocoded_address": "town": "Jijoca de Jericoacoara"
+        The name should not be "Jericoacoara Jijoca de Jericoacoara" because the address component contains the remote name. It should be just "Jericoacoara".
+
+        Example 6:
+        "remote_name": "Moraes Almeida",
+        "geocoded_address": "suburb": "Beija-Flor", "city": "Itaituba"
+        The name should not be "Itaituba BeijaFlor" because it omits the remote name. It should be "Moraes Almeida Itaituba".
+
+        Example 7:
+        "remote_name": Capim Grosso,
+        "geocoded_address": "suburb": "Vicente Ferreira", "town"": "Capim Grosso"
+        The name should not be "Capim Grosso" because it omits a suitable adress componant. It should be "Capim Grosso Vicente Ferreira".
 
 Here is the data to process:
 {batch_data}
